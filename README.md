@@ -15,3 +15,5 @@ The following example describes the syntax of a field.
 Example: 'farmRole.role.os.name' gets the field 'name' field of the 'os' object of the 'role' object of the 'farmRoleObject' of the server
 
 Available objects are Roles, Farm Roles and OS. Please consult the API documentation [here](https://api-explorer.scalr.com) for more information about the available fields in these objects.
+
+See credentials-sample.json for an example of JSON credential file.
