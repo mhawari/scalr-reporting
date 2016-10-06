@@ -2,12 +2,19 @@
 import json
 from api.client import ScalrApiClient
 
-fieldsToGetDefault = ['id','farmRole.role.os.id','farmRole.role.os.name','cloudPlatform' ]
+fieldsToGetDefault = ['farmRole.role.os.family','farmRole.role.os.id','cloudPlatform','cloudLocation','farmRole.instance.instanceType.id']
 def getField(data,fieldName):
-	fields = fieldName.split('.')
-	for p in fields:
-		data = data[p]
-	return str(data)
+    fields = fieldName.split('.')
+    for p in fields:
+        if isinstance(data,list):
+            data = enumerate(data)
+        if not isinstance(data,dict):
+            return "N/A"
+        if p in data.keys():
+            data = data[p]
+        else:
+            return "N/A"
+    return str(data)
 
 def main(credentials_file, fieldsToGet):
     # Setup credentials
