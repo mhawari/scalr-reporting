@@ -2,14 +2,14 @@
 import json
 from api.client import ScalrApiClient
 
-fieldsToGet = ['farmRole.role.os.id','farmRole.role.os.name','cloudPlatform' ]
+fieldsToGetDefault = ['id','farmRole.role.os.id','farmRole.role.os.name','cloudPlatform' ]
 def getField(data,fieldName):
 	fields = fieldName.split('.')
 	for p in fields:
 		data = data[p]
-	return data
+	return str(data)
 
-def main(credentials_file):
+def main(credentials_file, fieldsToGet):
     # Setup credentials
     with open(credentials_file) as f:
         creds = json.load(f)
@@ -55,5 +55,6 @@ if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument("credentials", help="Path to credentials file")
+    parser.add_argument("-f","--fieldsToGet",help="List of the fields to report. Example: id farmRole.role.os.name cloudPlatform", metavar="fields", nargs='+',type=str, default=fieldsToGetDefault, required=False)
     ns = parser.parse_args()
-    main(ns.credentials)
+    main(ns.credentials,ns.fieldsToGet)
