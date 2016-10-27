@@ -1,5 +1,6 @@
 #!/usr/bin/python
 import json
+import requests
 from api.client import ScalrApiClient
 
 def main(credentials_file):
@@ -88,6 +89,13 @@ def main(credentials_file):
         bulk_request += json.dumps(f)
         bulk_request += '\n'
     print bulk_request
+    requests.delete('http://localhost:9200/scalr_oses')
+    requests.delete('http://localhost:9200/scalr_roles')
+    requests.delete('http://localhost:9200/scalr_servers')
+    requests.delete('http://localhost:9200/scalr_farms')
+    requests.delete('http://localhost:9200/scalr_farmroles')
+    requests.delete('http://localhost:9200/scalr_env')
+    requests.put('http://localhost:9200/_bulk', data=bulk_request)
 
 
 if __name__ == "__main__":
