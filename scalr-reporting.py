@@ -87,11 +87,11 @@ def main(credentials_file):
         bulk_request += '\n'
     """
     for s in resServers:
-        bulk_request += '{ "index" : { "_index" : "scalr_servers_%s", "_type" : "type", "_id" : "%s" } }\n' % (todayTs, s['id'])
+        bulk_request += '{ "index" : { "_index" : "scalr_servers_ts_%s", "_type" : "type" } }\n' % (todayTs)
         bulk_request += json.dumps(s)
         bulk_request += '\n'
     for f in resFarms.values():
-        bulk_request += '{ "index" : { "_index" : "scalr_farms_%s", "_type" : "type", "_id" : %s } }\n' % (todayTs, f['id'])
+        bulk_request += '{ "index" : { "_index" : "scalr_farms_ts_%s", "_type" : "type" } }\n' % (todayTs)
         bulk_request += json.dumps(f)
         bulk_request += '\n'
     for s in resServers:
