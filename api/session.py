@@ -62,6 +62,7 @@ class ScalrApiSession(requests.Session):
         return request
 
     def request(self, *args, **kwargs):
+        kwargs['verify'] = False
         res = super(ScalrApiSession, self).request(*args, **kwargs)
         self.client.logger.info("%s - %s", " ".join(args), res.status_code)
         try:
