@@ -1,6 +1,7 @@
 #!/usr/bin/python
 import json
 import requests
+import datetime
 from api.client import ScalrApiClient
 
 def main(credentials_file):
@@ -12,6 +13,8 @@ def main(credentials_file):
 
     client = ScalrApiClient(api_url.rstrip("/"), api_key_id, api_key_secret)
     client = ScalrApiClient(api_url.rstrip("/"), api_key_id, api_key_secret)
+    todayTs = datetime.datetime.utcnow().date().isoformat()
+    nowTs = datetime.datetime.utcnow().isoformat()
     #Get all the env
     envs = client.list('/api/v1beta0/account/environments/')
     resServers = []
@@ -31,6 +34,7 @@ def main(credentials_file):
         for server in servers:
             farmRoles[server['farmRole']['id']] = {}
             server['env'] = env_id
+            server['timestamp'] = nowTs
         #Get all the farmroles
         for k in farmRoles.keys():
             farmRoles[k] = client.fetch('/api/v1beta0/user/%s/farm-roles/%d' % (env_id,k))
@@ -46,6 +50,7 @@ def main(credentials_file):
         for k in farms.keys():
             farms[k] = client.fetch('/api/v1beta0/user/%s/farms/%d/' % (env_id,k))
             farms[k]['env'] = env_id
+            farms[k]['timestamp'] = nowTs
         #Get all the OSes
         for k in oses.keys():
             oses[k] = client.fetch('/api/v1beta0/user/%s/os/%s/' % (env_id,k) )
@@ -64,13 +69,9 @@ def main(credentials_file):
         resFarms.update(farms)
     #Now generate a bulk request
     bulk_request = ""
-    for e in envs:
+    """for e in envs:
         bulk_request += '{ "index" : { "_index" : "scalr_env", "_type" : "type", "_id" : %s } }\n' % e['id']
         bulk_request += json.dumps(e)
-        bulk_request += '\n'
-    for s in resServers:
-        bulk_request += '{ "index" : { "_index" : "scalr_servers", "_type" : "type", "_id" : "%s" } }\n' % s['id']
-        bulk_request += json.dumps(s)
         bulk_request += '\n'
     for fr in resFarmRoles.values():
         bulk_request += '{ "index" : { "_index" : "scalr_farmroles", "_type" : "type", "_id" : %s } }\n' % fr['id']
@@ -84,17 +85,29 @@ def main(credentials_file):
         bulk_request += '{ "index" : { "_index" : "scalr_oses", "_type" : "type", "_id" : "%s" } }\n' % os['id']
         bulk_request += json.dumps(os)
         bulk_request += '\n'
+    """
+    for s in resServers:
+        bulk_request += '{ "index" : { "_index" : "scalr_servers_%s", "_type" : "type", "_id" : "%s" } }\n' % (todayTs, s['id'])
+        bulk_request += json.dumps(s)
+        bulk_request += '\n'
     for f in resFarms.values():
-        bulk_request += '{ "index" : { "_index" : "scalr_farms", "_type" : "type", "_id" : %s } }\n' % f['id']
+        bulk_request += '{ "index" : { "_index" : "scalr_farms_%s", "_type" : "type", "_id" : %s } }\n' % (todayTs, f['id'])
         bulk_request += json.dumps(f)
         bulk_request += '\n'
-    print bulk_request
-    requests.delete('http://localhost:9200/scalr_oses')
-    requests.delete('http://localhost:9200/scalr_roles')
+    for s in resServers:
+        bulk_request += '{ "index" : { "_index" : "scalr_servers", "_type" : "type", "_id" : "%s" } }\n' % (s['id'])
+        bulk_request += json.dumps(s)
+        bulk_request += '\n'
+    for f in resFarms.values():
+        bulk_request += '{ "index" : { "_index" : "scalr_farms", "_type" : "type", "_id" : %s } }\n' % (f['id'])
+        bulk_request += json.dumps(f)
+        bulk_request += '\n'
+    #requests.delete('http://localhost:9200/scalr_oses')
+    #requests.delete('http://localhost:9200/scalr_roles')
     requests.delete('http://localhost:9200/scalr_servers')
     requests.delete('http://localhost:9200/scalr_farms')
-    requests.delete('http://localhost:9200/scalr_farmroles')
-    requests.delete('http://localhost:9200/scalr_env')
+    #requests.delete('http://localhost:9200/scalr_farmroles')
+    #requests.delete('http://localhost:9200/scalr_env')
     requests.put('http://localhost:9200/_bulk', data=bulk_request)
 
 
