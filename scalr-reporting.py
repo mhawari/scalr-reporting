@@ -25,6 +25,7 @@ def main(credentials_file):
     #Fetch all data in each env
     for env in envs:
         env_id = env['id']
+        env_name = env['name']
         #Get all the servers
         servers = client.list('/api/v1beta0/user/%s/servers/' % env_id)
         farmRoles = {}
@@ -34,6 +35,7 @@ def main(credentials_file):
         for server in servers:
             farmRoles[server['farmRole']['id']] = {}
             server['env'] = env_id
+            server['envName'] = env_name
             server['timestamp'] = nowTs
         #Get all the farmroles
         for k in farmRoles.keys():
@@ -50,6 +52,7 @@ def main(credentials_file):
         for k in farms.keys():
             farms[k] = client.fetch('/api/v1beta0/user/%s/farms/%d/' % (env_id,k))
             farms[k]['env'] = env_id
+            farms[k]['envName'] = env_name
             farms[k]['timestamp'] = nowTs
         #Get all the OSes
         for k in oses.keys():
