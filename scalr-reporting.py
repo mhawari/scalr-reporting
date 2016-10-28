@@ -1,67 +1,119 @@
 #!/usr/bin/python
 import json
+import requests
+import datetime
 from api.client import ScalrApiClient
 
-fieldsToGetDefault = ['farmRole.role.os.family','farmRole.role.os.id','cloudPlatform','cloudLocation','farmRole.instance.instanceType.id']
-def getField(data,fieldName):
-    fields = fieldName.split('.')
-    for p in fields:
-        if isinstance(data,list):
-            data = enumerate(data)
-        if not isinstance(data,dict):
-            return "N/A"
-        if p in data.keys():
-            data = data[p]
-        else:
-            return "N/A"
-    return str(data)
-
-def main(credentials_file, fieldsToGet):
+def main(credentials_file):
     # Setup credentials
     with open(credentials_file) as f:
         creds = json.load(f)
-        api_url, api_key_id, api_key_secret, env_id = \
-                [creds.get(k, "") for k in ["api_url", "api_key_id", "api_key_secret", "env_id"]]
+        api_url, api_key_id, api_key_secret = \
+                [creds.get(k, "") for k in ["api_url", "api_key_id", "api_key_secret"]]
 
     client = ScalrApiClient(api_url.rstrip("/"), api_key_id, api_key_secret)
     client = ScalrApiClient(api_url.rstrip("/"), api_key_id, api_key_secret)
-    #Get all the servers
-    servers = client.list('/api/v1beta0/user/%s/servers/' % env_id)
-    farmRoles = {}
-    roles = {}
-    oses = {}
-    for server in servers:
-    	farmRoles[server['farmRole']['id']] = {}
-    #Get all the farmroles
-    for k in farmRoles.keys():
-    	farmRoles[k] = client.fetch('/api/v1beta0/user/%s/farm-roles/%d' % (env_id,k))
-    	roles[farmRoles[k]['role']['id']] = {}
-    #Get all the roles
-    for k in roles.keys():
-    	roles[k] = client.fetch('/api/v1beta0/user/%s/roles/%d' % (env_id,k))
-    	oses[roles[k]['os']['id']] = {}
-    #Get all the OSes
-    for k in oses.keys():
-    	oses[k] = client.fetch('/api/v1beta0/user/%s/os/%s/' % (env_id,k) )
-    #Join everything
-    for server in servers:
-    	server['farmRole'] = farmRoles[server['farmRole']['id']]
-    for f in farmRoles.keys():
-    	farmRoles[f]['role'] = roles[farmRoles[f]['role']['id']]
-    for r in roles.keys():
-    	roles[r]['os'] = oses[roles[r]['os']['id']]
-    #now output!
-    for s in servers:
-    	line = ""
-    	for fieldName in fieldsToGet:
-    		line += getField(s,fieldName) + ','
-    	line = line[:-1]
-    	print line
+    todayTs = datetime.datetime.utcnow().date().isoformat()
+    nowTs = datetime.datetime.utcnow().isoformat()
+    #Get all the env
+    envs = client.list('/api/v1beta0/account/environments/')
+    resServers = []
+    resFarmRoles = {}
+    resRoles = {}
+    resOses = {}
+    resFarms = {}
+    #Fetch all data in each env
+    for env in envs:
+        env_id = env['id']
+        #Get all the servers
+        servers = client.list('/api/v1beta0/user/%s/servers/' % env_id)
+        farmRoles = {}
+        roles = {}
+        oses = {}
+        farms = {}
+        for server in servers:
+            farmRoles[server['farmRole']['id']] = {}
+            server['env'] = env_id
+            server['timestamp'] = nowTs
+        #Get all the farmroles
+        for k in farmRoles.keys():
+            farmRoles[k] = client.fetch('/api/v1beta0/user/%s/farm-roles/%d' % (env_id,k))
+            farmRoles[k]['env'] = env_id
+            roles[farmRoles[k]['role']['id']] = {}
+            farms[farmRoles[k]['farm']['id']] = {}
+        #Get all the roles
+        for k in roles.keys():
+            roles[k] = client.fetch('/api/v1beta0/user/%s/roles/%d' % (env_id,k))
+            roles[k]['env'] = env_id
+            oses[roles[k]['os']['id']] = {}
+        #Get all the farms
+        for k in farms.keys():
+            farms[k] = client.fetch('/api/v1beta0/user/%s/farms/%d/' % (env_id,k))
+            farms[k]['env'] = env_id
+            farms[k]['timestamp'] = nowTs
+        #Get all the OSes
+        for k in oses.keys():
+            oses[k] = client.fetch('/api/v1beta0/user/%s/os/%s/' % (env_id,k) )
+            oses[k]['env'] = env_id
+        #Add some info in server
+        for s in servers:
+            farmRoleId = s['farmRole']['id']
+            roleId = farmRoles[farmRoleId]['role']['id']
+            osId = roles[roleId]['os']['id']
+            s['osName'] = oses[osId]['name']
+            s['useScalrAgent'] = roles[roleId]['useScalrAgent']
+        resServers += servers
+        resFarmRoles.update(farmRoles)
+        resRoles.update(roles)
+        resOses.update(oses)
+        resFarms.update(farms)
+    #Now generate a bulk request
+    bulk_request = ""
+    """for e in envs:
+        bulk_request += '{ "index" : { "_index" : "scalr_env", "_type" : "type", "_id" : %s } }\n' % e['id']
+        bulk_request += json.dumps(e)
+        bulk_request += '\n'
+    for fr in resFarmRoles.values():
+        bulk_request += '{ "index" : { "_index" : "scalr_farmroles", "_type" : "type", "_id" : %s } }\n' % fr['id']
+        bulk_request += json.dumps(fr)
+        bulk_request += '\n'
+    for r in resRoles.values():
+        bulk_request += '{ "index" : { "_index" : "scalr_roles", "_type" : "type", "_id" : %s } }\n' % r['id']
+        bulk_request += json.dumps(r)
+        bulk_request += '\n'
+    for os in resOses.values():
+        bulk_request += '{ "index" : { "_index" : "scalr_oses", "_type" : "type", "_id" : "%s" } }\n' % os['id']
+        bulk_request += json.dumps(os)
+        bulk_request += '\n'
+    """
+    for s in resServers:
+        bulk_request += '{ "index" : { "_index" : "scalr_servers_ts_%s", "_type" : "type" } }\n' % (todayTs)
+        bulk_request += json.dumps(s)
+        bulk_request += '\n'
+    for f in resFarms.values():
+        bulk_request += '{ "index" : { "_index" : "scalr_farms_ts_%s", "_type" : "type" } }\n' % (todayTs)
+        bulk_request += json.dumps(f)
+        bulk_request += '\n'
+    for s in resServers:
+        bulk_request += '{ "index" : { "_index" : "scalr_servers", "_type" : "type", "_id" : "%s" } }\n' % (s['id'])
+        bulk_request += json.dumps(s)
+        bulk_request += '\n'
+    for f in resFarms.values():
+        bulk_request += '{ "index" : { "_index" : "scalr_farms", "_type" : "type", "_id" : %s } }\n' % (f['id'])
+        bulk_request += json.dumps(f)
+        bulk_request += '\n'
+    #requests.delete('http://localhost:9200/scalr_oses')
+    #requests.delete('http://localhost:9200/scalr_roles')
+    requests.delete('http://localhost:9200/scalr_servers')
+    requests.delete('http://localhost:9200/scalr_farms')
+    #requests.delete('http://localhost:9200/scalr_farmroles')
+    #requests.delete('http://localhost:9200/scalr_env')
+    requests.put('http://localhost:9200/_bulk', data=bulk_request)
+
 
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser()
-    parser.add_argument("credentials", help="Path to credentials file")
-    parser.add_argument("-f","--fieldsToGet",help="List of the fields to report. Example: id farmRole.role.os.name cloudPlatform", metavar="fields", nargs='+',type=str, default=fieldsToGetDefault, required=False)
+    parser.add_argument("credentials", help="cred file")
     ns = parser.parse_args()
-    main(ns.credentials,ns.fieldsToGet)
+    main(ns.credentials)
